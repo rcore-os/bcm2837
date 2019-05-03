@@ -9,5 +9,6 @@ zero_kernel_offset = []
 use_generic_timer = ["aarch64"]
 
 [dependencies]
+log = "0.4"
 volatile = "0.2.4"
 aarch64= { git = "https://github.com/equation314/aarch64", optional = true }
