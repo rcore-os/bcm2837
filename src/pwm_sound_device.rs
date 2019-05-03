@@ -168,46 +168,48 @@ impl PWMSoundDevice {
         }
     }
 
-    pub unsafe fn init(&mut self) {
-        self.SetupDMAControlBlock (0);
-        self.SetupDMAControlBlock (1);
-        (*self.m_pControlBlock[0]).nNextControlBlockAddress = BUS_ADDRESS(self.m_pControlBlock[1] as u32);
-        (*self.m_pControlBlock[1]).nNextControlBlockAddress = BUS_ADDRESS(self.m_pControlBlock[0] as u32);
+    pub fn init(&mut self) {
+        unsafe {
+            self.SetupDMAControlBlock(0);
+            self.SetupDMAControlBlock(1);
+            (*self.m_pControlBlock[0]).nNextControlBlockAddress = BUS_ADDRESS(self.m_pControlBlock[1] as u32);
+            (*self.m_pControlBlock[1]).nNextControlBlockAddress = BUS_ADDRESS(self.m_pControlBlock[0] as u32);
 
-        // start clock and PWM device
-        self.RunPWM();
+            // start clock and PWM device
+            self.RunPWM();
 
-        // enable and reset DMA channel
-        // PeripheralEntry();
+            // enable and reset DMA channel
+            // PeripheralEntry();
 
-        // assert! (self.m_nDMAChannel <= DMA_CHANNEL_MAX);
-        write32 (ARM_DMA_ENABLE as *mut u32, read32 (ARM_DMA_ENABLE as *const u32) | (1 << self.m_nDMAChannel));
-        delay_us(1000);
+            // assert! (self.m_nDMAChannel <= DMA_CHANNEL_MAX);
+            write32(ARM_DMA_ENABLE as *mut u32, read32(ARM_DMA_ENABLE as *const u32) | (1 << self.m_nDMAChannel));
+            delay_us(1000);
 
-        write32 (ARM_DMACHAN_CS (self.m_nDMAChannel) as *mut u32, CS_RESET);
-        while (read32 (ARM_DMACHAN_CS (self.m_nDMAChannel) as *const u32) & CS_RESET != 0)
-            {
-                // do nothing
-            }
+            write32(ARM_DMACHAN_CS(self.m_nDMAChannel) as *mut u32, CS_RESET);
+            while (read32(ARM_DMACHAN_CS(self.m_nDMAChannel) as *const u32) & CS_RESET != 0)
+                {
+                    // do nothing
+                }
 
-        // PeripheralExit ();
+            // PeripheralExit ();
 
-        // CDeviceNameService::Get ()->AddDevice ("sndpwm", this, FALSE);
+            // CDeviceNameService::Get ()->AddDevice ("sndpwm", this, FALSE);
+        }
     }
 
-    pub fn GetRangeMin(&self) -> u32 {
+    fn GetRangeMin(&self) -> u32 {
         0
     }
 
-    pub fn GetRangeMax(&self) -> u32 {
+    fn GetRangeMax(&self) -> u32 {
         self.m_nRange - 1
     }
 
-    pub fn GetRange(&self) -> u32 {
+    fn GetRange(&self) -> u32 {
         self.GetRangeMax()
     }
 
-    pub unsafe fn Start(&mut self) -> bool {
+    unsafe fn Start(&mut self) -> bool {
         assert!(self.m_State == TPWMSoundState::PWMSoundIdle);
 
         // fill buffer 0
@@ -268,7 +270,7 @@ impl PWMSoundDevice {
         return true;
     }
 
-    pub fn Cancel(&mut self) {
+    fn Cancel(&mut self) {
         // m_SpinLock.Acquire ();
         if (self.m_State == TPWMSoundState::PWMSoundRunning) {
             self.m_State = TPWMSoundState::PWMSoundCancelled;
@@ -278,12 +280,37 @@ impl PWMSoundDevice {
     }
 
 
-    pub fn IsActive(&self) -> bool {
+    fn IsActive(&self) -> bool {
         if self.m_State != TPWMSoundState::PWMSoundIdle {
             return true;
         } else {
             return false;
         }
+    }
+
+
+    pub fn Playback(&mut self, pSoundData: *const u8, nSamples: u32, nChannels: u32, nBitsPerSample: u32) {
+        assert!(!self.IsActive ());
+        assert!(pSoundData != ptr::null());
+        assert!(nChannels == 1 || nChannels == 2);
+        assert!(nBitsPerSample == 8 || nBitsPerSample == 16);
+
+        self.m_pSoundData = pSoundData;
+        self.m_nSamples	= nSamples;
+        self.m_nChannels = nChannels;
+        self.m_nBitsPerSample = nBitsPerSample;
+
+        unsafe {
+            self.Start();
+        }
+    }
+
+    pub fn PlaybackActive(&self) -> bool {
+        self.IsActive()
+    }
+
+    pub fn CancelPlayback(&mut self) {
+        self.Cancel();
     }
 
     /// \brief May overload this to provide the sound samples!
