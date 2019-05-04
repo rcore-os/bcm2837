@@ -36,7 +36,7 @@ pub struct EmmcRegisters {
 }
 
 pub struct Emmc {
-    registers: &'static mut EmmcRegisters,
+    pub registers: &'static mut EmmcRegisters,
 }
 
 impl Emmc {
