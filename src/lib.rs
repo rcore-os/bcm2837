@@ -10,3 +10,4 @@ pub mod interrupt;
 pub mod mailbox;
 pub mod mini_uart;
 pub mod timer;
+pub mod emmc;
