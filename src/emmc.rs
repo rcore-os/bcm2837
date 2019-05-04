@@ -3,7 +3,7 @@ use volatile::{ReadOnly, Volatile, WriteOnly};
 
 #[repr(C)]
 #[allow(non_snake_case)]
-struct EmmcRegisters {
+pub struct EmmcRegisters {
     ARG2: Volatile<u32>,
     BLKSIZECNT: Volatile<u32>,
     ARG1: Volatile<u32>,
@@ -35,7 +35,7 @@ struct EmmcRegisters {
     SLOTISR_VER: Volatile<u32>,
 }
 
-struct Emmc {
+pub struct Emmc {
     registers: &'static mut EmmcRegisters,
 }
 
