@@ -2,7 +2,7 @@
 
 Low level access to BCM2837 SoC on Raspberry Pi 3 Model B/B+.
 
-Used by [rCore](https://github.com/wangrunji0408/rCore).
+Used by [rCore](https://github.com/rcore-os/rCore).
 
 ## References
 
