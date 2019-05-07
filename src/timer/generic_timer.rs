@@ -47,12 +47,14 @@ struct Registers {
 /// The ARM generic timer.
 pub struct GenericTimer {
     registers: &'static mut Registers,
+    cntfrq: u64,
 }
 
 impl BasicTimer for GenericTimer {
     fn new() -> Self {
         GenericTimer {
             registers: unsafe { &mut *(GEN_TIMER_REG_BASE as *mut Registers) },
+            cntfrq: CNTFRQ_EL0.get() as u64, // 62500000
         }
     }
 
@@ -62,13 +64,11 @@ impl BasicTimer for GenericTimer {
     }
 
     fn read(&self) -> u64 {
-        let cntfrq = CNTFRQ_EL0.get(); // 62500000
-        (CNTPCT_EL0.get() * 1000000 / (cntfrq as u64)) as u64
+        (CNTPCT_EL0.get() * 1000000 / self.cntfrq) as u64
     }
 
     fn tick_in(&mut self, us: u32) {
-        let cntfrq = CNTFRQ_EL0.get(); // 62500000
-        CNTP_TVAL_EL0.set(((cntfrq as f64) * (us as f64) / 1000000.0) as u32);
+        CNTP_TVAL_EL0.set((self.cntfrq * (us as u64) / 1000000) as u32);
     }
 
     fn is_pending(&self) -> bool {
