@@ -11,7 +11,8 @@ pub const CLOCK_FREQ	: usize	= 500000000;		// PLLD
 pub const CLOCK_DIVIDER	: usize	= 2;
 
 pub const ARM_IO_BASE	: usize = KERNEL_OFFSET + 0x3F000000;
-pub const ARM_DMA_BASE : usize =  (ARM_IO_BASE + 0x7000);
+pub const ARM_DMA_BASE : usize = ARM_IO_BASE + 0x7000;
+// pub const ARM_DMA_CHAN_BASE : usize = KERNEL_OFFSET + 0x7E007000;  
 pub const GPU_IO_BASE	: usize = KERNEL_OFFSET + 0x7E000000;
 
 pub const GPU_CACHED_BASE	: usize = KERNEL_OFFSET + 0x40000000;

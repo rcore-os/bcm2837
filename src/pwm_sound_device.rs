@@ -32,21 +32,21 @@ fn ARM_DMACHAN_NEXTCONBK(chan: usize) -> usize {
     ARM_DMA_BASE + ((chan) * 0x100) + 0x1C
 }
 
-enum TPWMSoundState
-{
-    PWMSoundIdle = 0,
-    PWMSoundRunning = 1,
-    PWMSoundCancelled = 2,
-    PWMSoundTerminating = 3,
-    PWMSoundError = 4,
-    PWMSoundUnknown = 5
-}
+// enum TPWMSoundState
+// {
+const PWMSoundIdle : usize = 0;
+const PWMSoundRunning : usize = 1;
+const PWMSoundCancelled : usize = 2;
+const PWMSoundTerminating : usize = 3;
+const PWMSoundError : usize = 4;
+const PWMSoundUnknown : usize = 5;
+// }
 
-impl PartialEq for TPWMSoundState {
-    fn eq(&self, other: &TPWMSoundState) -> bool {
-        return *self == *other;
-    }
-}
+// impl PartialEq for TPWMSoundState {
+//     fn eq(&self, other: &TPWMSoundState) -> bool {
+//         return *self == *other;
+//     }
+// }
 
 enum TDREQ
 {
@@ -77,7 +77,7 @@ pub struct PWMSoundDevice {
     m_nRange: usize,
 
 
-    m_State: TPWMSoundState,
+    m_State: usize, // TPWMSoundState,
 
     m_bIRQConnected: bool,
 
@@ -123,22 +123,32 @@ impl PWMSoundDevice {
         // assert!(self.m_pDMABuffer[nID] != 0);
 
         self.m_pControlBlockBuffer[nID] = Vec::<u8>::new();
-        self.m_pControlBlockBuffer[nID].resize(size_of::<TDMAControlBlock>() + 31, 0);
+        self.m_pControlBlockBuffer[nID].resize(
+            size_of::<TDMAControlBlock>() + 31, 0);
         // assert!(self.m_pControlBlockBuffer[nID] != 0);
-        self.m_pControlBlock[nID] = ((self.m_pControlBlockBuffer[nID].as_ptr().offset(31) as usize) & !(31usize)) as *mut TDMAControlBlock;
+        self.m_pControlBlock[nID] = 
+            ((self.m_pControlBlockBuffer[nID].as_ptr().offset(31) as usize) 
+             & !(31usize)) as *mut TDMAControlBlock;
 
-        (*self.m_pControlBlock[nID]).nTransferInformation = (((TDREQ::DREQSourcePWM as usize) << TI_PERMAP_SHIFT)
-        | (DEFAULT_BURST_LENGTH << TI_BURST_LENGTH_SHIFT)
-        | TI_SRC_WIDTH
-        | TI_SRC_INC
-        | TI_DEST_DREQ
-        | TI_WAIT_RESP
-        | TI_INTEN) as u32;
-        (*self.m_pControlBlock[nID]).nSourceAddress           = BUS_ADDRESS(self.m_pDMABuffer[nID].as_ptr() as usize) as u32;
-        (*self.m_pControlBlock[nID]).nDestinationAddress      = ((ARM_PWM_FIF1 & 0xFFFFFF) + GPU_IO_BASE) as u32;
-        (*self.m_pControlBlock[nID]).n2DModeStride            = 0;
-        (*self.m_pControlBlock[nID]).nReserved[0]	       = 0;
-        (*self.m_pControlBlock[nID]).nReserved[1]	       = 0;
+        (*self.m_pControlBlock[nID]).nTransferInformation =
+            (((TDREQ::DREQSourcePWM as usize) << TI_PERMAP_SHIFT)
+            | (DEFAULT_BURST_LENGTH << TI_BURST_LENGTH_SHIFT)
+            | TI_SRC_WIDTH
+            | TI_SRC_INC
+            | TI_DEST_DREQ
+            | TI_WAIT_RESP
+            | TI_INTEN) as u32;
+        (*self.m_pControlBlock[nID]).nSourceAddress 
+            = BUS_ADDRESS(self.m_pDMABuffer[nID].as_ptr() as usize) as u32;
+
+        //warn!("3");
+        warn!("{} {}", self.m_pDMABuffer[nID].as_ptr() as usize, BUS_ADDRESS(self.m_pDMABuffer[nID].as_ptr() as usize) as u32);
+
+        (*self.m_pControlBlock[nID]).nDestinationAddress 
+            = ((ARM_PWM_FIF1 & 0xFFFFFF) + GPU_IO_BASE) as u32;
+        (*self.m_pControlBlock[nID]).n2DModeStride = 0;
+        (*self.m_pControlBlock[nID]).nReserved[0] = 0;
+        (*self.m_pControlBlock[nID]).nReserved[1] = 0;
     }
 
 
@@ -155,7 +165,7 @@ impl PWMSoundDevice {
             // m_Audio2 (GPIOPinAudioRight, GPIOModeAlternateFunction0),
             // m_Clock (GPIOClockPWM, GPIOClockSourcePLLD),
             m_bIRQConnected: (false),
-            m_State: TPWMSoundState::PWMSoundIdle,
+            m_State: PWMSoundIdle,
             m_nDMAChannel: allocateDMAChannel (DMA_CHANNEL_LITE),
             m_pDMABuffer: [Vec::<u32>::new(), Vec::<u32>::new()],
             m_pControlBlockBuffer: [Vec::<u8>::new(), Vec::<u8>::new()],
@@ -184,8 +194,9 @@ impl PWMSoundDevice {
             // assert! (self.m_nDMAChannel <= DMA_CHANNEL_MAX);
             write32(ARM_DMA_ENABLE, read32(ARM_DMA_ENABLE) | (1 << self.m_nDMAChannel));
             delay_us(1000);
-
+            
             write32(ARM_DMACHAN_CS(self.m_nDMAChannel), CS_RESET as u32);
+
             while read32(ARM_DMACHAN_CS(self.m_nDMAChannel)) & CS_RESET as u32 != 0
                 {
                     // do nothing
@@ -210,7 +221,7 @@ impl PWMSoundDevice {
     }
 
     unsafe fn Start(&mut self) -> bool {
-        assert!(self.m_State == TPWMSoundState::PWMSoundIdle);
+        assert!(self.m_State == PWMSoundIdle);
 
         // fill buffer 0
         self.m_nNextBuffer = 0;
@@ -219,7 +230,7 @@ impl PWMSoundDevice {
             return false;
         }
 
-        self.m_State = TPWMSoundState::PWMSoundRunning;
+        self.m_State = PWMSoundRunning;
 
         // connect IRQ
         assert!(self.m_nDMAChannel <= DMA_CHANNEL_MAX);
@@ -229,6 +240,7 @@ impl PWMSoundDevice {
             // self.m_pInterruptSystem->ConnectIRQ (ARM_IRQ_DMA0+m_nDMAChannel, InterruptStub, this);
             self.m_bIRQConnected = true;
         }
+        
 
         // enable PWM DMA operation
 
@@ -236,13 +248,13 @@ impl PWMSoundDevice {
             | (7 << ARM_PWM_DMAC_PANIC__SHIFT)
             | (7 << ARM_PWM_DMAC_DREQ__SHIFT)) as u32);
 
+        
         // switched this on when playback stops to avoid clicks, switch it off here
         write32 (ARM_PWM_CTL, read32 (ARM_PWM_CTL) & !(ARM_PWM_CTL_RPTL1 | ARM_PWM_CTL_RPTL2) as u32);
 
 
         // start DMA
-
-        assert!((read32 (ARM_DMACHAN_CS (self.m_nDMAChannel)) & CS_INT as u32) == 0);
+        assert!((read32(ARM_DMACHAN_CS(self.m_nDMAChannel)) & CS_INT as u32) == 0);
         assert!((read32 (ARM_DMA_INT_STATUS) & (1 << self.m_nDMAChannel)) == 0);
 
         assert!(self.m_pControlBlock[0] != ptr::null_mut());
@@ -253,27 +265,31 @@ impl PWMSoundDevice {
             | (DEFAULT_PANIC_PRIORITY << CS_PANIC_PRIORITY_SHIFT)
             | (DEFAULT_PRIORITY << CS_PRIORITY_SHIFT)
             | CS_ACTIVE) as u32);
-
+        
         // fill buffer 1
+        /*
         if !self.GetNextChunk() {
             // m_SpinLock.Acquire ();
+            warn!("fail to fill buffer 1");
 
-            if self.m_State == TPWMSoundState::PWMSoundRunning {
+            if self.m_State == PWMSoundRunning {
                 write32 (ARM_DMACHAN_NEXTCONBK (self.m_nDMAChannel), 0);
 
-                self.m_State = TPWMSoundState::PWMSoundTerminating;
+                self.m_State = PWMSoundTerminating;
             }
 
             // m_SpinLock.Release ();
         }
+        */
+        
 
         return true;
     }
 
     fn Cancel(&mut self) {
         // m_SpinLock.Acquire ();
-        if (self.m_State == TPWMSoundState::PWMSoundRunning) {
-            self.m_State = TPWMSoundState::PWMSoundCancelled;
+        if (self.m_State == PWMSoundRunning) {
+            self.m_State = PWMSoundCancelled;
         }
 
         // m_SpinLock.Release ();
@@ -281,7 +297,7 @@ impl PWMSoundDevice {
 
 
     fn IsActive(&self) -> bool {
-        if self.m_State != TPWMSoundState::PWMSoundIdle {
+        if self.m_State != PWMSoundIdle {
             return true;
         } else {
             return false;
@@ -438,7 +454,7 @@ impl PWMSoundDevice {
     }
 
     unsafe fn InterruptHandler(&mut self) {
-        assert!(self.m_State != TPWMSoundState::PWMSoundIdle);
+        assert!(self.m_State != PWMSoundIdle);
         assert!(self.m_nDMAChannel <= DMA_CHANNEL_MAX);
 
         // #ifndef NDEBUG
@@ -453,19 +469,19 @@ impl PWMSoundDevice {
         write32 (ARM_DMACHAN_CS (self.m_nDMAChannel), nCS);	// reset CS_INT
 
         if nCS & CS_ERROR as u32 != 0{
-            self.m_State = TPWMSoundState::PWMSoundError;
+            self.m_State = PWMSoundError;
             return;
         }
 
         // m_SpinLock.Acquire ();
 
-        if (self.m_State == TPWMSoundState::PWMSoundRunning && !self.GetNextChunk()) || (self.m_State == TPWMSoundState::PWMSoundCancelled) {
+        if (self.m_State == PWMSoundRunning && !self.GetNextChunk()) || (self.m_State == PWMSoundCancelled) {
             write32(ARM_DMACHAN_NEXTCONBK(self.m_nDMAChannel), 0);
             // avoid clicks
             write32(ARM_PWM_CTL, read32(ARM_PWM_CTL) | ARM_PWM_CTL_RPTL1 as u32| ARM_PWM_CTL_RPTL2 as u32);
-            self.m_State = TPWMSoundState::PWMSoundTerminating;
-        } else if (self.m_State == TPWMSoundState::PWMSoundTerminating) {
-            self.m_State = TPWMSoundState::PWMSoundIdle;
+            self.m_State = PWMSoundTerminating;
+        } else if (self.m_State == PWMSoundTerminating) {
+            self.m_State = PWMSoundIdle;
         }
 
         // m_SpinLock.Release ();
