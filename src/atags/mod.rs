@@ -1,9 +1,9 @@
 mod atag;
 mod raw;
 
-use super::consts::KERNEL_OFFSET;
 pub use self::atag::*;
 pub use self::raw::{Cmd, Core, Mem};
+use super::consts::KERNEL_OFFSET;
 
 /// The address at which the firmware loads the ATAGS.
 const ATAG_BASE: usize = KERNEL_OFFSET + 0x100;

@@ -1,4 +1,3 @@
-use crate::consts::*;
 use core::convert::TryFrom;
 
 pub fn to_usize(x: u32) -> usize {
@@ -23,6 +22,6 @@ pub unsafe fn read32(nAddress: usize) -> u32 {
     return *(nAddress as *const u32);
 }
 
-pub unsafe fn write32(nAddress: usize, nValue : u32) {
+pub unsafe fn write32(nAddress: usize, nValue: u32) {
     *(nAddress as *mut u32) = nValue;
 }

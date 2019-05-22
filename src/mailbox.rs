@@ -75,6 +75,8 @@ impl Mailbox {
     /// Write to the requested channel of mailbox 1.
     pub fn write(&mut self, channel: MailboxChannel, data: u32) {
         while self.registers.MAIL1_STA.read() & (MailboxStatus::MailboxFull as u32) != 0 {}
-        self.registers.MAIL1_WRT.write((data & !0xF) | (channel as u32));
+        self.registers
+            .MAIL1_WRT
+            .write((data & !0xF) | (channel as u32));
     }
 }
