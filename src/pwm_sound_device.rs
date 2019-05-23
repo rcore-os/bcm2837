@@ -4,6 +4,7 @@ use crate::util::*;
 use alloc::vec::*;
 use core::mem::size_of;
 use core::ptr;
+use volatile::{ReadOnly, Volatile, WriteOnly};
 
 // macro_rules! ARM_DMACHAN_TI { ($( $chan:expr ),*) => (ARM_DMA_BASE + (($chan) * 0x100) + 0x08) }
 // macro_rules! ARM_DMACHAN_SOURCE_AD { ($( $chan:expr ),*) => (ARM_DMA_BASE + (($chan) * 0x100) + 0x0C) }
@@ -66,6 +67,18 @@ struct TDMAControlBlock {
     nReserved: [u32; 2],
 }
 
+#[repr(C)]
+#[allow(non_snake_case)]
+struct DMAControlBlockRegisters {
+    TI: Volatile<u32>,
+    SOURCE_AD: Volatile<u32>,
+    DEST_AD: Volatile<u32>,
+    TXFR_LEN: Volatile<u32>,
+    STRIDE: Volatile<u32>,
+    NEXTCONBK: Volatile<u32>,
+    reserved: [Volatile<u32>; 2]
+}
+
 pub struct PWMSoundDevice {
     m_nChunkSize: usize,
     m_nRange: usize,
@@ -76,8 +89,12 @@ pub struct PWMSoundDevice {
 
     m_nDMAChannel: usize,
     m_pDMABuffer: [usize; 2],
+    m_pDMABufferPADDR: [usize; 2],
     m_pControlBlockBuffer: [Vec<u8>; 2],
     m_pControlBlock: [*mut TDMAControlBlock; 2],
+
+    // dma_control_block: [&'static mut DMAControlBlockRegisters; 2],
+    // dma_cb_addr: [usize; 2],
 
     m_nNextBuffer: usize, // 0 or 1
 
@@ -130,14 +147,16 @@ impl PWMSoundDevice {
             | TI_DEST_DREQ
             | TI_WAIT_RESP
             | TI_INTEN) as u32;
-        (*self.m_pControlBlock[nID]).nSourceAddress =
-            BUS_ADDRESS(self.m_pDMABuffer[nID]) as u32;
+        // (*self.m_pControlBlock[nID]).nSourceAddress =
+        //    BUS_ADDRESS(self.m_pDMABufferPADDR[nID]) as u32;
+        (*self.m_pControlBlock[nID]).nSourceAddress = self.m_pDMABufferPADDR[nID] as u32;
 
         //warn!("3");
         warn!(
-            "{} {}",
+            "{} {} {}",
             self.m_pDMABuffer[nID],
-            BUS_ADDRESS(self.m_pDMABuffer[nID]) as u32
+            self.m_pDMABufferPADDR[nID],
+            self.m_pDMABufferPADDR[nID] as u32
         );
 
         (*self.m_pControlBlock[nID]).nDestinationAddress =
@@ -151,7 +170,7 @@ impl PWMSoundDevice {
     /// \param nChunkSize	twice the number of samples (words) to be handled\n
     ///			with one call to GetChunk() (one word per stereo channel)
     /// default: nSampleRate: 44100, nChunkSize: 2048
-    pub fn new(nSampleRate: usize, nChunkSize: usize, pDMABuffer0: usize, pDMABuffer1: usize) -> PWMSoundDevice {
+    pub fn new(nSampleRate: usize, nChunkSize: usize, vaddr0: usize, paddr0: usize, vaddr1: usize, paddr1: usize) -> PWMSoundDevice {
         PWMSoundDevice {
             m_nChunkSize: (nChunkSize),
             m_nRange: ((CLOCK_FREQ / CLOCK_DIVIDER + nSampleRate / 2) / nSampleRate),
@@ -161,7 +180,8 @@ impl PWMSoundDevice {
             m_bIRQConnected: (false),
             m_State: PWMSoundIdle,
             m_nDMAChannel: allocateDMAChannel(DMA_CHANNEL_LITE),
-            m_pDMABuffer: [pDMABuffer0, pDMABuffer1],
+            m_pDMABuffer: [vaddr0, vaddr1],
+            m_pDMABufferPADDR: [paddr0, paddr1],
             m_pControlBlockBuffer: [Vec::<u8>::new(), Vec::<u8>::new()],
             m_pControlBlock: [ptr::null_mut(); 2],
             m_nNextBuffer: 0,
@@ -360,7 +380,7 @@ impl PWMSoundDevice {
         (*self.m_pControlBlock[self.m_nNextBuffer]).nTransferLength = nTransferLength as u32;
 
         CleanAndInvalidateDataCacheRange(
-            self.m_pDMABuffer[self.m_nNextBuffer],
+            self.m_pDMABufferPADDR[self.m_nNextBuffer],
             nTransferLength,
         );
         CleanAndInvalidateDataCacheRange(
