@@ -75,7 +75,7 @@ pub struct PWMSoundDevice {
     m_bIRQConnected: bool,
 
     m_nDMAChannel: usize,
-    m_pDMABuffer: [Vec<u32>; 2],
+    m_pDMABuffer: [usize; 2],
     m_pControlBlockBuffer: [Vec<u8>; 2],
     m_pControlBlock: [*mut TDMAControlBlock; 2],
 
@@ -112,8 +112,8 @@ impl PWMSoundDevice {
     unsafe fn SetupDMAControlBlock(&mut self, nID: usize) {
         assert!(nID <= 1);
 
-        self.m_pDMABuffer[nID] = Vec::<u32>::new();
-        self.m_pDMABuffer[nID].resize(self.m_nChunkSize, 0);
+        // self.m_pDMABuffer[nID] = Vec::<u32>::new();
+        // self.m_pDMABuffer[nID].resize(self.m_nChunkSize, 0);
         // assert!(self.m_pDMABuffer[nID] != 0);
 
         self.m_pControlBlockBuffer[nID] = Vec::<u8>::new();
@@ -131,13 +131,13 @@ impl PWMSoundDevice {
             | TI_WAIT_RESP
             | TI_INTEN) as u32;
         (*self.m_pControlBlock[nID]).nSourceAddress =
-            BUS_ADDRESS(self.m_pDMABuffer[nID].as_ptr() as usize) as u32;
+            BUS_ADDRESS(self.m_pDMABuffer[nID]) as u32;
 
         //warn!("3");
         warn!(
             "{} {}",
-            self.m_pDMABuffer[nID].as_ptr() as usize,
-            BUS_ADDRESS(self.m_pDMABuffer[nID].as_ptr() as usize) as u32
+            self.m_pDMABuffer[nID],
+            BUS_ADDRESS(self.m_pDMABuffer[nID]) as u32
         );
 
         (*self.m_pControlBlock[nID]).nDestinationAddress =
@@ -151,7 +151,7 @@ impl PWMSoundDevice {
     /// \param nChunkSize	twice the number of samples (words) to be handled\n
     ///			with one call to GetChunk() (one word per stereo channel)
     /// default: nSampleRate: 44100, nChunkSize: 2048
-    pub fn new(nSampleRate: usize, nChunkSize: usize) -> PWMSoundDevice {
+    pub fn new(nSampleRate: usize, nChunkSize: usize, pDMABuffer0: usize, pDMABuffer1: usize) -> PWMSoundDevice {
         PWMSoundDevice {
             m_nChunkSize: (nChunkSize),
             m_nRange: ((CLOCK_FREQ / CLOCK_DIVIDER + nSampleRate / 2) / nSampleRate),
@@ -161,7 +161,7 @@ impl PWMSoundDevice {
             m_bIRQConnected: (false),
             m_State: PWMSoundIdle,
             m_nDMAChannel: allocateDMAChannel(DMA_CHANNEL_LITE),
-            m_pDMABuffer: [Vec::<u32>::new(), Vec::<u32>::new()],
+            m_pDMABuffer: [pDMABuffer0, pDMABuffer1],
             m_pControlBlockBuffer: [Vec::<u8>::new(), Vec::<u8>::new()],
             m_pControlBlock: [ptr::null_mut(); 2],
             m_nNextBuffer: 0,
@@ -174,6 +174,7 @@ impl PWMSoundDevice {
 
     pub fn init(&mut self) {
         unsafe {
+            warn!("test test\n");
             self.SetupDMAControlBlock(0);
             self.SetupDMAControlBlock(1);
             (*self.m_pControlBlock[0]).nNextControlBlockAddress =
@@ -359,7 +360,7 @@ impl PWMSoundDevice {
         (*self.m_pControlBlock[self.m_nNextBuffer]).nTransferLength = nTransferLength as u32;
 
         CleanAndInvalidateDataCacheRange(
-            self.m_pDMABuffer[self.m_nNextBuffer].as_ptr() as usize,
+            self.m_pDMABuffer[self.m_nNextBuffer],
             nTransferLength,
         );
         CleanAndInvalidateDataCacheRange(
@@ -373,7 +374,7 @@ impl PWMSoundDevice {
     }
 
     unsafe fn GetChunk(&mut self, nChunkSize: usize) -> usize {
-        let pBuffer: *mut u32 = self.m_pDMABuffer[self.m_nNextBuffer].as_mut_ptr();
+        let pBuffer: *mut u32 = self.m_pDMABuffer[self.m_nNextBuffer] as *mut u32;
         assert!(pBuffer != ptr::null_mut());
         assert!(nChunkSize > 0);
         assert!((nChunkSize & 1) == 0);
