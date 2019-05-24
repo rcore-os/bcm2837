@@ -19,7 +19,8 @@ fn ARM_DMACHAN_CONBLK_AD(chan: usize) -> usize {
     ARM_DMA_BASE + (chan * 0x100) + 0x04
 }
 fn BUS_ADDRESS(addr: usize) -> usize {
-    (((addr) & !0xC0000000) | GPU_MEM_BASE)
+    return addr | 0xC0000000;
+    // (((addr) & !0xC0000000) | GPU_MEM_BASE)
 }
 
 fn ARM_DMACHAN_CS(chan: usize) -> usize {
@@ -27,6 +28,22 @@ fn ARM_DMACHAN_CS(chan: usize) -> usize {
 }
 fn ARM_DMACHAN_NEXTCONBK(chan: usize) -> usize {
     ARM_DMA_BASE + ((chan) * 0x100) + 0x1C
+}
+
+fn ARM_DMACHAN_DEST_AD(chan: usize) -> usize {
+    ARM_DMA_BASE + ((chan) * 0x100) + 0x10
+}
+
+fn ARM_DMACHAN_SRC_AD(chan: usize) -> usize {
+    ARM_DMA_BASE + ((chan) * 0x100) + 0xc
+}
+
+fn ARM_DMACHAN_DEBUG(chan: usize) -> usize {
+    ARM_DMA_BASE + ((chan) * 0x100) + 0x20
+}
+
+fn ARM_DMACHAN_TI(chan: usize) -> usize {
+    ARM_DMA_BASE + ((chan) * 0x100) + 0x8
 }
 
 // enum TPWMSoundState
@@ -92,6 +109,7 @@ pub struct PWMSoundDevice {
     m_pDMABufferPADDR: [usize; 2],
     m_pControlBlockBuffer: [Vec<u8>; 2],
     m_pControlBlock: [*mut TDMAControlBlock; 2],
+    m_pControlBlockPADDR: [usize; 2],
 
     // dma_control_block: [&'static mut DMAControlBlockRegisters; 2],
     // dma_cb_addr: [usize; 2],
@@ -133,11 +151,11 @@ impl PWMSoundDevice {
         // self.m_pDMABuffer[nID].resize(self.m_nChunkSize, 0);
         // assert!(self.m_pDMABuffer[nID] != 0);
 
-        self.m_pControlBlockBuffer[nID] = Vec::<u8>::new();
-        self.m_pControlBlockBuffer[nID].resize(size_of::<TDMAControlBlock>() + 31, 0);
+        // self.m_pControlBlockBuffer[nID] = Vec::<u8>::new();
+        // self.m_pControlBlockBuffer[nID].resize(size_of::<TDMAControlBlock>() + 31, 0);
         // assert!(self.m_pControlBlockBuffer[nID] != 0);
-        self.m_pControlBlock[nID] = ((self.m_pControlBlockBuffer[nID].as_ptr().offset(31) as usize)
-            & !(31usize)) as *mut TDMAControlBlock;
+        // self.m_pControlBlock[nID] = ((self.m_pControlBlockBuffer[nID].as_ptr().offset(31) as usize)
+        //    & !(31usize)) as *mut TDMAControlBlock;
 
         (*self.m_pControlBlock[nID]).nTransferInformation = (((TDREQ::DREQSourcePWM as usize)
             << TI_PERMAP_SHIFT)
@@ -147,16 +165,16 @@ impl PWMSoundDevice {
             | TI_DEST_DREQ
             | TI_WAIT_RESP
             | TI_INTEN) as u32;
-        // (*self.m_pControlBlock[nID]).nSourceAddress =
-        //    BUS_ADDRESS(self.m_pDMABufferPADDR[nID]) as u32;
-        (*self.m_pControlBlock[nID]).nSourceAddress = self.m_pDMABufferPADDR[nID] as u32;
+         (*self.m_pControlBlock[nID]).nSourceAddress =
+            BUS_ADDRESS(self.m_pDMABufferPADDR[nID]) as u32;
+        // (*self.m_pControlBlock[nID]).nSourceAddress = self.m_pDMABufferPADDR[nID] as u32;
 
         //warn!("3");
         warn!(
             "{} {} {}",
             self.m_pDMABuffer[nID],
             self.m_pDMABufferPADDR[nID],
-            self.m_pDMABufferPADDR[nID] as u32
+            (*self.m_pControlBlock[nID]).nSourceAddress
         );
 
         (*self.m_pControlBlock[nID]).nDestinationAddress =
@@ -164,13 +182,15 @@ impl PWMSoundDevice {
         (*self.m_pControlBlock[nID]).n2DModeStride = 0;
         (*self.m_pControlBlock[nID]).nReserved[0] = 0;
         (*self.m_pControlBlock[nID]).nReserved[1] = 0;
+
+        warn!("write to pwm addr: {}", (*self.m_pControlBlock[nID]).nDestinationAddress);
     }
 
     /// \param nSampleRate	sample rate in Hz
     /// \param nChunkSize	twice the number of samples (words) to be handled\n
     ///			with one call to GetChunk() (one word per stereo channel)
     /// default: nSampleRate: 44100, nChunkSize: 2048
-    pub fn new(nSampleRate: usize, nChunkSize: usize, vaddr0: usize, paddr0: usize, vaddr1: usize, paddr1: usize) -> PWMSoundDevice {
+    pub fn new(nSampleRate: usize, nChunkSize: usize, vaddr0: usize, paddr0: usize, vaddr1: usize, paddr1: usize, cb0_vaddr: usize, cb0_paddr: usize) -> PWMSoundDevice {
         PWMSoundDevice {
             m_nChunkSize: (nChunkSize),
             m_nRange: ((CLOCK_FREQ / CLOCK_DIVIDER + nSampleRate / 2) / nSampleRate),
@@ -179,11 +199,13 @@ impl PWMSoundDevice {
             // m_Clock (GPIOClockPWM, GPIOClockSourcePLLD),
             m_bIRQConnected: (false),
             m_State: PWMSoundIdle,
-            m_nDMAChannel: allocateDMAChannel(DMA_CHANNEL_LITE),
+            m_nDMAChannel: 5, // allocateDMAChannel(DMA_CHANNEL_LITE),
             m_pDMABuffer: [vaddr0, vaddr1],
             m_pDMABufferPADDR: [paddr0, paddr1],
             m_pControlBlockBuffer: [Vec::<u8>::new(), Vec::<u8>::new()],
-            m_pControlBlock: [ptr::null_mut(); 2],
+            //m_pControlBlock: [ptr::null_mut(); 2],
+            m_pControlBlock: [cb0_vaddr as *mut TDMAControlBlock, 0 as *mut TDMAControlBlock],
+            m_pControlBlockPADDR: [cb0_paddr, 0],
             m_nNextBuffer: 0,
             m_pSoundData: ptr::null(),
             m_nSamples: 0,
@@ -196,11 +218,11 @@ impl PWMSoundDevice {
         unsafe {
             warn!("test test\n");
             self.SetupDMAControlBlock(0);
-            self.SetupDMAControlBlock(1);
-            (*self.m_pControlBlock[0]).nNextControlBlockAddress =
-                BUS_ADDRESS(self.m_pControlBlock[1] as usize) as u32;
-            (*self.m_pControlBlock[1]).nNextControlBlockAddress =
-                BUS_ADDRESS(self.m_pControlBlock[0] as usize) as u32;
+            // self.SetupDMAControlBlock(1);
+            (*self.m_pControlBlock[0]).nNextControlBlockAddress = 0;
+                // BUS_ADDRESS(self.m_pControlBlock[1] as usize) as u32;
+            // (*self.m_pControlBlock[1]).nNextControlBlockAddress =
+            //    BUS_ADDRESS(self.m_pControlBlock[0] as usize) as u32;
 
             // start clock and PWM device
             self.RunPWM();
@@ -214,6 +236,7 @@ impl PWMSoundDevice {
                 read32(ARM_DMA_ENABLE) | (1 << self.m_nDMAChannel),
             );
             delay_us(1000);
+            warn!("read from dma enable register: {}", read32(ARM_DMA_ENABLE));
 
             write32(ARM_DMACHAN_CS(self.m_nDMAChannel), CS_RESET as u32);
 
@@ -239,6 +262,17 @@ impl PWMSoundDevice {
         self.GetRangeMax()
     }
 
+    fn PrintStatus(&self) {
+        unsafe {
+            warn!("(read from dma) cb ad {}", read32(ARM_DMACHAN_CONBLK_AD(self.m_nDMAChannel)));
+            warn!("(read from dma) debug {}", read32(ARM_DMACHAN_DEBUG(self.m_nDMAChannel)));
+            warn!("(read from dma) ti {}", read32(ARM_DMACHAN_TI(self.m_nDMAChannel)));
+            warn!("(read from dma) cs {}", read32(ARM_DMACHAN_CS(self.m_nDMAChannel)));
+            warn!("(read from dma) source ad {} dst ad {}", read32(ARM_DMACHAN_SRC_AD(self.m_nDMAChannel)), 
+                read32(ARM_DMACHAN_DEST_AD(self.m_nDMAChannel)));
+        }
+    }
+
     unsafe fn Start(&mut self) -> bool {
         assert!(self.m_State == PWMSoundIdle);
 
@@ -254,11 +288,13 @@ impl PWMSoundDevice {
         // connect IRQ
         assert!(self.m_nDMAChannel <= DMA_CHANNEL_MAX);
 
+        /*
         if !self.m_bIRQConnected {
             // assert!(self.m_pInterruptSystem != 0);
             // self.m_pInterruptSystem->ConnectIRQ (ARM_IRQ_DMA0+m_nDMAChannel, InterruptStub, this);
             self.m_bIRQConnected = true;
         }
+        */
 
         // enable PWM DMA operation
 
@@ -278,11 +314,18 @@ impl PWMSoundDevice {
         assert!((read32(ARM_DMACHAN_CS(self.m_nDMAChannel)) & CS_INT as u32) == 0);
         assert!((read32(ARM_DMA_INT_STATUS) & (1 << self.m_nDMAChannel)) == 0);
 
-        assert!(self.m_pControlBlock[0] != ptr::null_mut());
         write32(
             ARM_DMACHAN_CONBLK_AD(self.m_nDMAChannel),
-            BUS_ADDRESS(self.m_pControlBlock[0] as usize) as u32,
+            BUS_ADDRESS(self.m_pControlBlockPADDR[0] as usize) as u32,
         );
+
+        warn!("##### after writing cb, before writing cs #####");
+        self.PrintStatus();
+
+        delay_us(1000);
+
+        warn!("##### after delay #####");
+        self.PrintStatus();
 
         write32(
             ARM_DMACHAN_CS(self.m_nDMAChannel),
@@ -291,6 +334,9 @@ impl PWMSoundDevice {
                 | (DEFAULT_PRIORITY << CS_PRIORITY_SHIFT)
                 | CS_ACTIVE) as u32,
         );
+
+        warn!("##### after writing cs #####");
+        self.PrintStatus();
 
         // fill buffer 1
         /*
@@ -321,11 +367,23 @@ impl PWMSoundDevice {
     }
 
     fn IsActive(&self) -> bool {
+        unsafe {
+            warn!("##### in isactive #####");
+            self.PrintStatus();
+
+            if read32(ARM_DMACHAN_CONBLK_AD(self.m_nDMAChannel)) != 0 {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        /*
         if self.m_State != PWMSoundIdle {
             return true;
         } else {
             return false;
         }
+        */
     }
 
     pub fn Playback(
@@ -335,7 +393,7 @@ impl PWMSoundDevice {
         nChannels: usize,
         nBitsPerSample: usize,
     ) {
-        assert!(!self.IsActive());
+        //assert!(!self.IsActive());
         assert!(pSoundData != ptr::null());
         assert!(nChannels == 1 || nChannels == 2);
         assert!(nBitsPerSample == 8 || nBitsPerSample == 16);
@@ -373,8 +431,8 @@ impl PWMSoundDevice {
             return false;
         }
 
-        let nTransferLength: usize = nChunkSize * size_of::<usize>();
-        assert!(nTransferLength <= TXFR_LEN_MAX_LITE);
+        let nTransferLength: usize = nChunkSize * size_of::<u32>();
+        // assert!(nTransferLength <= TXFR_LEN_MAX_LITE);
 
         assert!(self.m_pControlBlock[self.m_nNextBuffer] != ptr::null_mut());
         (*self.m_pControlBlock[self.m_nNextBuffer]).nTransferLength = nTransferLength as u32;
@@ -410,25 +468,29 @@ impl PWMSoundDevice {
         assert!(self.m_nBitsPerSample == 8 || self.m_nBitsPerSample == 16);
 
         let mut nSample = 0;
-        while nSample < nChunkSize / 2 {
-            // 2 channels on outpu
-            let mut nValue: usize = *self.m_pSoundData as usize;
+        while nSample < nChunkSize {
+            // two channels
+            let mut nValue = (*self.m_pSoundData) as u32;
             self.m_pSoundData = self.m_pSoundData.offset(1);
+            
+            /*
             if self.m_nBitsPerSample > 8 {
                 nValue |= (*self.m_pSoundData as usize) << 8;
                 self.m_pSoundData = self.m_pSoundData.offset(1);
                 nValue = (nValue + 0x8000) & 0xFFFF; // signed -> unsigned (16 bit)
             }
-
+            
             if self.m_nBitsPerSample >= 12 {
                 nValue >>= self.m_nBitsPerSample - 12;
             } else {
                 nValue <<= 12 - self.m_nBitsPerSample;
-            }
+            }*/
+            nValue <<= 12 - self.m_nBitsPerSample;
 
             *pBuffer.offset(nSample as isize) = nValue as u32;
             nSample += 1;
 
+            /*
             if self.m_nChannels == 2 {
                 nValue = (*self.m_pSoundData) as usize;
                 self.m_pSoundData = self.m_pSoundData.offset(1);
@@ -444,6 +506,7 @@ impl PWMSoundDevice {
                     nValue <<= 12 - self.m_nBitsPerSample;
                 }
             }
+            */
 
             *pBuffer.offset(nSample as isize) = nValue as u32;
             nSample += 1;
