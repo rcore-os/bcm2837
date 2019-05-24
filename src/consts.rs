@@ -34,7 +34,7 @@ pub const ARM_PWM_CTL_RPTL2: usize = (1 << 10);
 pub const ARM_PWM_CTL_SBIT2: usize = (1 << 11);
 pub const ARM_PWM_CTL_POLA2: usize = (1 << 12);
 pub const ARM_PWM_CTL_USEF2: usize = (1 << 13);
-pub const ARM_PWM_CTL_MSEN2: usize = (1 << 14);
+pub const ARM_PWM_CTL_MSEN2: usize = (1 << 15);
 
 //
 // PWM status register
@@ -116,3 +116,11 @@ pub const DMA_CHANNEL__MASK: usize = 0x0F; // explicit channel number 0-12
 pub const DMA_CHANNEL_NONE: usize = 0x80; // returned if no channel available
 pub const DMA_CHANNEL_NORMAL: usize = 0x81; // normal DMA engine requested
 pub const DMA_CHANNEL_LITE: usize = 0x82; // lite (or normal) DMA engine requested
+
+// GPIO CLOCK
+pub const ARM_CM_BASE: usize = IO_BASE + 0x101000;
+// pub const ARM_CM_BASE: u32 = 0x3F000000 + 0x101000;
+// pub const ARM_CM_BASE: u32 = 0x7e101000;
+pub const ARM_CM_GP0CTL: usize = ARM_CM_BASE + 0x70;
+pub const ARM_CM_GP0DIV: usize = ARM_CM_BASE + 0x74;
+pub const ARM_CM_PASSWD: u32 = (0x5A << 24);
