@@ -40,14 +40,26 @@ fn dsb() {
 // macro_rules! ARM_DMACHAN_STRIDE { ($( $chan:expr ),*) => (ARM_DMA_BASE + (($chan) * 0x100) + 0x18) }
 // macro_rules! ARM_DMACHAN_DEBUG { ($( $chan:expr ),*)	=>	(ARM_DMA_BASE + (($chan) * 0x100) + 0x20) }
 
+#[inline(always)]
+fn dmb() {
+    unsafe {
+        //asm!("mcr p15, 0, #0, c7, c10, 5" : : "r" (0) : : "volatile"); // , "memory");
+        //asm!("mov r12, 0" ::::"volatile");
+        //asm!("mcr p15, 0, r12, c7, c10, 5" ::::"volatile");
+        //asm!("mov pc, lr" ::::"volatile");
+        asm!("nop");
+    }
+}
+
 fn CleanAndInvalidateDataCacheRange(nAddress: usize, nLength: usize) {}
 
 fn ARM_DMACHAN_CONBLK_AD(chan: usize) -> usize {
     ARM_DMA_BASE + (chan * 0x100) + 0x04
 }
 fn BUS_ADDRESS(addr: usize) -> usize {
-    return addr | 0xC0000000;
+    // return addr | 0xC0000000;
     // (((addr) & !0xC0000000) | GPU_MEM_BASE)
+    return addr;
 }
 
 fn ARM_DMACHAN_CS(chan: usize) -> usize {
@@ -145,6 +157,12 @@ struct DMAChannelRegister{
     DEBUG: Volatile<u32>
 }
 
+#[repr(C)]
+#[allow(non_snake_case)]
+struct DMAEnableRegister{
+    ENABLE: Volatile<u32>,
+}
+
 pub struct PWMSoundDevice {
     m_nChunkSize: usize,
     m_nRange: usize,
@@ -177,7 +195,8 @@ pub struct PWMSoundDevice {
                              */
     
     dma_channel_register: &'static mut DMAChannelRegister,
-    dma_control_block: &'static mut DMAControlBlock
+    dma_control_block: &'static mut DMAControlBlock,
+    dma_enable_register: &'static mut DMAEnableRegister
 }
 
 fn allocateDMAChannel(nChannel: usize) -> usize {
@@ -219,6 +238,8 @@ impl PWMSoundDevice {
             | TI_WAIT_RESP
             | TI_INTEN) as u32;
         */
+
+        /*
         (*self.m_pControlBlock[nID]).nTransferInformation = (((TDREQ::DREQSourcePWM as usize)
             << TI_PERMAP_SHIFT)
             | TI_SRC_INC
@@ -245,6 +266,22 @@ impl PWMSoundDevice {
         (*self.m_pControlBlock[nID]).nReserved[1] = 0;
 
         warn!("write to pwm addr: {}", (*self.m_pControlBlock[nID]).nDestinationAddress);
+        */
+
+        self.dma_control_block.TI.write((((TDREQ::DREQSourcePWM as usize)
+            << TI_PERMAP_SHIFT)
+            | TI_SRC_INC
+            | TI_DEST_INC
+            | TI_WAIT_RESP
+            | TI_INTEN) as u32);
+        self.dma_control_block.SOURCE_AD.write(BUS_ADDRESS(self.m_pDMABufferPADDR[nID]) as u32);
+        self.dma_control_block.DEST_AD.write(((ARM_PWM_FIF1 & 0xFFFFFF) + GPU_IO_BASE) as u32);
+        self.dma_control_block.NEXTCONBK.write(0);
+        self.dma_control_block.STRIDE.write(0);
+        self.dma_control_block.reserved[0].write(0);
+        self.dma_control_block.reserved[1].write(0);
+        
+        //warn!("write to pwm addr: {}", (*self.m_pControlBlock[nID]).nDestinationAddress);
     }
 
     /// \param nSampleRate	sample rate in Hz
@@ -274,6 +311,7 @@ impl PWMSoundDevice {
             m_nBitsPerSample: 0,
             dma_channel_register: unsafe { &mut *(ARM_DMA_CHANNEL_BASE(5) as *mut DMAChannelRegister) },
             dma_control_block: unsafe { &mut *(cb0_vaddr as *mut DMAControlBlock) },
+            dma_enable_register: unsafe { &mut *(ARM_DMA_ENABLE as *mut DMAEnableRegister) },
         }
     }
 
@@ -282,7 +320,7 @@ impl PWMSoundDevice {
             warn!("test test\n");
             self.SetupDMAControlBlock(0);
             // self.SetupDMAControlBlock(1);
-            (*self.m_pControlBlock[0]).nNextControlBlockAddress = 0;
+            // (*self.m_pControlBlock[0]).nNextControlBlockAddress = 0;
                 // BUS_ADDRESS(self.m_pControlBlock[1] as usize) as u32;
             // (*self.m_pControlBlock[1]).nNextControlBlockAddress =
             //    BUS_ADDRESS(self.m_pControlBlock[0] as usize) as u32;
@@ -294,18 +332,25 @@ impl PWMSoundDevice {
             // PeripheralEntry();
 
             // assert! (self.m_nDMAChannel <= DMA_CHANNEL_MAX);
+            /*
             write32(
                 ARM_DMA_ENABLE,
                 read32(ARM_DMA_ENABLE) | (1 << self.m_nDMAChannel),
             );
+            */
+            self.dma_enable_register.ENABLE.write(
+                self.dma_enable_register.ENABLE.read() | (1 << self.m_nDMAChannel));
+
             delay_us(1000);
-            warn!("read from dma enable register: {}", read32(ARM_DMA_ENABLE));
+            // warn!("read from dma enable register: {}", read32(ARM_DMA_ENABLE));
 
-            write32(ARM_DMACHAN_CS(self.m_nDMAChannel), CS_RESET as u32);
+            // write32(ARM_DMACHAN_CS(self.m_nDMAChannel), CS_RESET as u32);
 
+            /*
             while read32(ARM_DMACHAN_CS(self.m_nDMAChannel)) & CS_RESET as u32 != 0 {
                 // do nothing
             }
+            */
 
             // PeripheralExit ();
 
@@ -327,6 +372,18 @@ impl PWMSoundDevice {
 
     fn PrintStatus(&self) {
         unsafe {
+            warn!("Read from DMA:");
+            warn!("CS: {}", self.dma_channel_register.CS.read());
+            warn!("CONBLK_AD: {}", self.dma_channel_register.CONBLK_AD.read());
+            warn!("TI: {}", self.dma_channel_register.TI.read());
+            warn!("SOURCE_AD: {}", self.dma_channel_register.SOURCE_AD.read());
+            warn!("DEST_AD: {}", self.dma_channel_register.DEST_AD.read());
+            warn!("TXFR_LEN: {}", self.dma_channel_register.TXFR_LEN.read());
+            warn!("NEXTCONBK: {}", self.dma_channel_register.NEXTCONBZK.read());
+            warn!("DEBUG: {}", self.dma_channel_register.DEBUG.read());
+            warn!("");
+            dmb();
+            /*
             warn!("(read from dma) cb ad {}", read32(ARM_DMACHAN_CONBLK_AD(self.m_nDMAChannel)));
             warn!("(read from dma) next cb ad {}", read32(ARM_DMACHAN_NEXTCONBK(self.m_nDMAChannel)));
             warn!("(read from dma) debug {}", read32(ARM_DMACHAN_DEBUG(self.m_nDMAChannel)));
@@ -337,6 +394,7 @@ impl PWMSoundDevice {
                 read32(ARM_DMACHAN_DEST_AD(self.m_nDMAChannel)));
             warn!("");
             warn!("");
+            */
         }
     }
 
@@ -383,46 +441,68 @@ impl PWMSoundDevice {
         // assert!((read32(ARM_DMACHAN_CS(self.m_nDMAChannel)) & CS_INT as u32) == 0);
         // assert!((read32(ARM_DMA_INT_STATUS) & (1 << self.m_nDMAChannel)) == 0);
 
-        delay(2000);
+        delay_us(2000);
 
         // abort 
-        
+        dmb();
+        self.dma_channel_register.CS.write(
+            self.dma_channel_register.CS.read() | (1 << 30)
+        );
+        /*
         write32(
             ARM_DMACHAN_CS(self.m_nDMAChannel),
             read32(ARM_DMACHAN_CS(self.m_nDMAChannel)) | (1 << 30)
         );
+        */
 
-        delay(2000);
+        delay_us(2000);
         
-        // reset 
+        // reset
+        dmb();
+        self.dma_channel_register.CS.write(
+            self.dma_channel_register.CS.read() | (1 << 31)
+        );
+        /* 
         write32(
             ARM_DMACHAN_CS(self.m_nDMAChannel),
             read32(ARM_DMACHAN_CS(self.m_nDMAChannel)) | (1 << 31)
         );
+        */
 
-        delay(2000);
+        delay_us(2000);
         
         // clear end
+        dmb();
+        self.dma_channel_register.CS.write(
+            self.dma_channel_register.CS.read() | (1 << 1)
+        );
+        /*
         write32(
             ARM_DMACHAN_CS(self.m_nDMAChannel),
             read32(ARM_DMACHAN_CS(self.m_nDMAChannel)) | (1 << 1)
         );
-
-        delay(2000);
+        */
+        delay_us(2000);
         
         // write cb addr
+        dmb();
+        self.dma_channel_register.CONBLK_AD.write(
+            BUS_ADDRESS(self.m_pControlBlockPADDR[0] as usize) as u32
+        );
+        /*
         write32(
             ARM_DMACHAN_CONBLK_AD(self.m_nDMAChannel),
             BUS_ADDRESS(self.m_pControlBlockPADDR[0] as usize) as u32,
         );
+        */
 
-        delay(2000);
+        delay_us(2000);
 
         warn!("##### after writing cb, before writing cs #####");
         self.PrintStatus();
         
 
-        delay(2000);
+        delay_us(2000);
 
         // manually write
         /*
@@ -436,7 +516,26 @@ impl PWMSoundDevice {
         self.PrintStatus();
         */
 
+        dmb();
+        self.dma_channel_register.CS.write(
+            (CS_WAIT_FOR_OUTSTANDING_WRITES
+                | (DEFAULT_PANIC_PRIORITY << CS_PANIC_PRIORITY_SHIFT)
+                | (DEFAULT_PRIORITY << CS_PRIORITY_SHIFT)) as u32
+        );
+
+        delay_us(2000);
+        warn!("##### after writing priority");
+        self.PrintStatus();
         
+        dmb();
+        self.dma_channel_register.CS.write(
+            (CS_WAIT_FOR_OUTSTANDING_WRITES
+                | (DEFAULT_PANIC_PRIORITY << CS_PANIC_PRIORITY_SHIFT)
+                | (DEFAULT_PRIORITY << CS_PRIORITY_SHIFT)
+                | CS_ACTIVE) as u32
+        );
+        delay_us(2000);
+        /*
         write32(
             ARM_DMACHAN_CS(self.m_nDMAChannel),
             (CS_WAIT_FOR_OUTSTANDING_WRITES
@@ -444,6 +543,7 @@ impl PWMSoundDevice {
                 | (DEFAULT_PRIORITY << CS_PRIORITY_SHIFT)
                 | CS_ACTIVE) as u32,
         );
+        */
 
         warn!("##### after writing cs #####");
         self.PrintStatus();
@@ -481,8 +581,10 @@ impl PWMSoundDevice {
         unsafe {
             warn!("##### in isactive #####");
             self.PrintStatus();
+            delay_us(2000);
 
-            if read32(ARM_DMACHAN_CONBLK_AD(self.m_nDMAChannel)) != 0 {
+            if self.dma_channel_register.CONBLK_AD.read() != 0 {
+            // if read32(ARM_DMACHAN_CONBLK_AD(self.m_nDMAChannel)) != 0 {
                 return true;
             } else {
                 return false;
@@ -545,9 +647,11 @@ impl PWMSoundDevice {
         let nTransferLength: usize = nChunkSize * size_of::<u32>();
         // assert!(nTransferLength <= TXFR_LEN_MAX_LITE);
 
-        assert!(self.m_pControlBlock[self.m_nNextBuffer] != ptr::null_mut());
-        (*self.m_pControlBlock[self.m_nNextBuffer]).nTransferLength = nTransferLength as u32;
+        // assert!(self.m_pControlBlock[self.m_nNextBuffer] != ptr::null_mut());
+        // (*self.m_pControlBlock[self.m_nNextBuffer]).nTransferLength = nTransferLength as u32;
+        self.dma_control_block.TXFR_LEN.write(nTransferLength as u32);
 
+        /*
         CleanAndInvalidateDataCacheRange(
             self.m_pDMABufferPADDR[self.m_nNextBuffer],
             nTransferLength,
@@ -556,6 +660,7 @@ impl PWMSoundDevice {
             self.m_pControlBlock[self.m_nNextBuffer] as usize,
             size_of::<TDMAControlBlock>() as usize,
         );
+        */
 
         self.m_nNextBuffer ^= 1;
 
@@ -639,7 +744,7 @@ impl PWMSoundDevice {
 
         delay_us(2000);
 
-        assert!((1 << 8) <= self.m_nRange && self.m_nRange < (1 << 16));
+        // assert!((1 << 8) <= self.m_nRange && self.m_nRange < (1 << 16));
         write32(ARM_PWM_RNG1, self.m_nRange as u32);
         write32(ARM_PWM_RNG2, self.m_nRange as u32);
 
