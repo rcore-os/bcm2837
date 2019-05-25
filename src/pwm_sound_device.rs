@@ -1,65 +1,30 @@
 use crate::consts::*;
 use crate::timer::*;
 use crate::util::*;
+use crate::pwm::*;
+
 use alloc::vec::*;
 use core::mem::size_of;
 use core::ptr;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
-/*
- #define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7,  c5, 4" : : "r" (0) : "memory")
- #define dmb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" : : "r" (0) : "memory")
- #define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" : : "r" (0) : "memory")
-*/
-
-/*
-fn isb() {
-    unsafe {
-        asm!("mcr p15, 0, %0, c7,  c5, 4" : : "r" (0) : : "volatile"); // , "memory");
-    }
-}
-
-fn dmb() {
-    unsafe {
-        asm!("mcr p15, 0, %0, c7, c10, 5" : : "r" (0) : : "volatile"); // , "memory");
-        asm!("mcr p15, 0, %0, c7, c10, 5" : : "r" (0) : : "volatile"); // , "memory");
-    }
-}
-
-fn dsb() {
-    unsafe {
-        asm!("mcr p15, 0, %0, c7, c10, 4" : : "r" (0) : "volatile"); // , "memory");
-    }
-}
-*/
-
-// macro_rules! ARM_DMACHAN_TI { ($( $chan:expr ),*) => (ARM_DMA_BASE + (($chan) * 0x100) + 0x08) }
-// macro_rules! ARM_DMACHAN_SOURCE_AD { ($( $chan:expr ),*) => (ARM_DMA_BASE + (($chan) * 0x100) + 0x0C) }
-// macro_rules! ARM_DMACHAN_DEST_AD { ($( $chan:expr ),*) => (ARM_DMA_BASE + (($chan) * 0x100) + 0x10) }
-// macro_rules! ARM_DMACHAN_TXFR_LEN { ($( $chan:expr ),*) => (ARM_DMA_BASE + (($chan) * 0x100) + 0x14) }
-// macro_rules! ARM_DMACHAN_STRIDE { ($( $chan:expr ),*) => (ARM_DMA_BASE + (($chan) * 0x100) + 0x18) }
-// macro_rules! ARM_DMACHAN_DEBUG { ($( $chan:expr ),*)	=>	(ARM_DMA_BASE + (($chan) * 0x100) + 0x20) }
+use aarch64::asm::*;
+use aarch64::barrier;
 
 #[inline(always)]
 fn dmb() {
     unsafe {
-        //asm!("mcr p15, 0, #0, c7, c10, 5" : : "r" (0) : : "volatile"); // , "memory");
-        //asm!("mov r12, 0" ::::"volatile");
-        //asm!("mcr p15, 0, r12, c7, c10, 5" ::::"volatile");
-        //asm!("mov pc, lr" ::::"volatile");
-        asm!("nop");
+        barrier::wmb();
+        barrier::rmb();
     }
 }
-
-fn CleanAndInvalidateDataCacheRange(nAddress: usize, nLength: usize) {}
 
 fn ARM_DMACHAN_CONBLK_AD(chan: usize) -> usize {
     ARM_DMA_BASE + (chan * 0x100) + 0x04
 }
+
 fn BUS_ADDRESS(addr: usize) -> usize {
-    // return addr | 0xC0000000;
-    // (((addr) & !0xC0000000) | GPU_MEM_BASE)
-    return addr;
+    ((addr) & !0xC0000000) | GPU_MEM_BASE
 }
 
 fn ARM_DMACHAN_CS(chan: usize) -> usize {
@@ -177,6 +142,7 @@ pub struct PWMSoundDevice {
     m_pControlBlockBuffer: [Vec<u8>; 2],
     m_pControlBlock: [*mut TDMAControlBlock; 2],
     m_pControlBlockPADDR: [usize; 2],
+    m_pControlBlockVADDR: [usize; 2],
 
     // dma_control_block: [&'static mut DMAControlBlockRegisters; 2],
     // dma_cb_addr: [usize; 2],
@@ -196,7 +162,8 @@ pub struct PWMSoundDevice {
     
     dma_channel_register: &'static mut DMAChannelRegister,
     dma_control_block: &'static mut DMAControlBlock,
-    dma_enable_register: &'static mut DMAEnableRegister
+    dma_enable_register: &'static mut DMAEnableRegister,
+    pwm_output: PWMOutput
 }
 
 fn allocateDMAChannel(nChannel: usize) -> usize {
@@ -280,6 +247,17 @@ impl PWMSoundDevice {
         self.dma_control_block.STRIDE.write(0);
         self.dma_control_block.reserved[0].write(0);
         self.dma_control_block.reserved[1].write(0);
+
+        flush_dcache_range(self.m_pControlBlockVADDR[0], 32);
+        let _paddr = address_translate(self.m_pControlBlockVADDR[0]);
+        warn!("pwm vaddr {}, paddr {}, aarch64 paddr {}", 
+            self.m_pControlBlockVADDR[0],
+            self.m_pControlBlockPADDR[0],
+            _paddr
+        );
+
+        // self.m_pControlBlockPADDR[0] = _paddr;
+
         
         //warn!("write to pwm addr: {}", (*self.m_pControlBlock[nID]).nDestinationAddress);
     }
@@ -304,6 +282,7 @@ impl PWMSoundDevice {
             //m_pControlBlock: [ptr::null_mut(); 2],
             m_pControlBlock: [cb0_vaddr as *mut TDMAControlBlock, 0 as *mut TDMAControlBlock],
             m_pControlBlockPADDR: [cb0_paddr, 0],
+            m_pControlBlockVADDR: [cb0_vaddr, 0],
             m_nNextBuffer: 0,
             m_pSoundData: ptr::null(),
             m_nSamples: 0,
@@ -312,6 +291,7 @@ impl PWMSoundDevice {
             dma_channel_register: unsafe { &mut *(ARM_DMA_CHANNEL_BASE(5) as *mut DMAChannelRegister) },
             dma_control_block: unsafe { &mut *(cb0_vaddr as *mut DMAControlBlock) },
             dma_enable_register: unsafe { &mut *(ARM_DMA_ENABLE as *mut DMAEnableRegister) },
+            pwm_output: PWMOutput::new()
         }
     }
 
@@ -326,7 +306,7 @@ impl PWMSoundDevice {
             //    BUS_ADDRESS(self.m_pControlBlock[0] as usize) as u32;
 
             // start clock and PWM device
-            self.RunPWM();
+            // self.RunPWM();
 
             // enable and reset DMA channel
             // PeripheralEntry();
@@ -338,6 +318,7 @@ impl PWMSoundDevice {
                 read32(ARM_DMA_ENABLE) | (1 << self.m_nDMAChannel),
             );
             */
+            self.pwm_output.start(5669, true);
             self.dma_enable_register.ENABLE.write(
                 self.dma_enable_register.ENABLE.read() | (1 << self.m_nDMAChannel));
 
@@ -423,7 +404,7 @@ impl PWMSoundDevice {
 
         // enable PWM DMA operation
 
-        
+        /*
         write32(
             ARM_PWM_DMAC,
             (ARM_PWM_DMAC_ENAB | (7 << ARM_PWM_DMAC_PANIC__SHIFT) | (7 << ARM_PWM_DMAC_DREQ__SHIFT))
@@ -436,10 +417,12 @@ impl PWMSoundDevice {
             ARM_PWM_CTL,
             read32(ARM_PWM_CTL) & !(ARM_PWM_CTL_RPTL1 | ARM_PWM_CTL_RPTL2) as u32,
         );
-
+        */
         // start DMA
         // assert!((read32(ARM_DMACHAN_CS(self.m_nDMAChannel)) & CS_INT as u32) == 0);
         // assert!((read32(ARM_DMA_INT_STATUS) & (1 << self.m_nDMAChannel)) == 0);
+
+        self.pwm_output.dma_start();
 
         delay_us(2000);
 
@@ -738,29 +721,9 @@ impl PWMSoundDevice {
         return nResult;
     }
 
-    unsafe fn RunPWM(&mut self) {
-        // start gpio clock
-        // not implement
-
-        delay_us(2000);
-
-        // assert!((1 << 8) <= self.m_nRange && self.m_nRange < (1 << 16));
-        write32(ARM_PWM_RNG1, self.m_nRange as u32);
-        write32(ARM_PWM_RNG2, self.m_nRange as u32);
-
-        write32(
-            ARM_PWM_CTL,
-            (ARM_PWM_CTL_PWEN1
-                | ARM_PWM_CTL_USEF1
-                | ARM_PWM_CTL_PWEN2
-                | ARM_PWM_CTL_USEF2
-                | ARM_PWM_CTL_CLRF1) as u32,
-        );
-
-        delay_us(2000);
-    }
-
     unsafe fn StopPWM(&mut self) {
+        self.pwm_output.stop();
+        /*
         write32(ARM_PWM_DMAC, 0);
         write32(ARM_PWM_CTL, 0); // disable PWM channel 0 and 1
 
@@ -768,9 +731,11 @@ impl PWMSoundDevice {
         // stop gpio clock
         // not implement
         delay_us(2000);
+        */
     }
 
     unsafe fn InterruptHandler(&mut self) {
+        /*
         assert!(self.m_State != PWMSoundIdle);
         assert!(self.m_nDMAChannel <= DMA_CHANNEL_MAX);
 
@@ -805,7 +770,7 @@ impl PWMSoundDevice {
         } else if self.m_State == PWMSoundTerminating {
             self.m_State = PWMSoundIdle;
         }
-
+        */
         // m_SpinLock.Release ();
     }
 

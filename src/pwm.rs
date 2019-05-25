@@ -84,6 +84,11 @@ impl PWMOutput {
         delay_us(2000);
     }
 
+    pub fn dma_start(&mut self) {
+        self.pwm_address_map.DMAC.write((
+            ARM_PWM_DMAC_ENAB | (7 << ARM_PWM_DMAC_PANIC__SHIFT) | (7 << ARM_PWM_DMAC_DREQ__SHIFT)) as u32);
+    }
+
     pub fn write(&mut self, channel: usize, data: u32) {
         if self.pwm_address_map.STA.read() & ARM_PWM_STA_BERR as u32 != 0 {
             warn!("pwm write error!: {}", self.pwm_address_map.STA.read());

@@ -6,6 +6,8 @@ extern crate alloc;
 extern crate volatile;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate aarch64;
 
 pub mod atags;
 pub mod consts;

@@ -18,6 +18,8 @@ pub unsafe fn write64(nAddress: * mut usize, nValue:usize) {
 }
 */
 
+/*
+
 pub unsafe fn read32(nAddress: usize) -> u32 {
     return *(nAddress as *const u32);
 }
@@ -26,3 +28,4 @@ pub unsafe fn write32(nAddress: usize, nValue: u32) {
     *(nAddress as *mut u32) = nValue;
 }
 
+*/
