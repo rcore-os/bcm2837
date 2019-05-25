@@ -41,7 +41,7 @@ impl PWMOutput {
         // warn!("range: {}", ((CLOCK_FREQ / CLOCK_DIVIDER + sample_rate / 2) / sample_rate));
         // init gpio clock
         let clk_clock = 6;
-        let clk_source = 1 as u32;
+        let clk_source = 6 as u32;
         let n_div_i = 2 as u32;
         let n_div_f = 0 as u32;
         let n_div_mash = 0 as u32;
@@ -98,16 +98,23 @@ impl PWMOutput {
 
     pub fn writeFIFO(&mut self, data: u32) {
         if self.pwm_address_map.STA.read() & ARM_PWM_STA_BERR as u32 != 0 {
-            warn!("pwm beer error!: {}", self.pwm_address_map.STA.read());
+            // warn!("pwm beer error!: {}", self.pwm_address_map.STA.read());
             self.pwm_address_map.STA.write(ARM_PWM_STA_BERR as u32);
         }
         if self.pwm_address_map.STA.read() & ARM_PWM_STA_WERR1 as u32 != 0 {
-            warn!("pwm write1 error!: {}", self.pwm_address_map.STA.read());
+            // warn!("pwm write1 error!: {}", self.pwm_address_map.STA.read());
             self.pwm_address_map.STA.write(ARM_PWM_STA_WERR1 as u32);
         }
+        if self.pwm_address_map.STA.read() & ARM_PWM_STA_GAPO1 as u32 != 0 {
+            // warn!("pwm gap1 error!: {}", self.pwm_address_map.STA.read());
+            self.pwm_address_map.STA.write(ARM_PWM_STA_GAPO1 as u32);
+        }
+        if self.pwm_address_map.STA.read() & ARM_PWM_STA_GAPO2 as u32 != 0 {
+            // warn!("pwm gap2 error!: {}", self.pwm_address_map.STA.read());
+            self.pwm_address_map.STA.write(ARM_PWM_STA_GAPO2 as u32);
+        }
         while self.pwm_address_map.STA.read() & ARM_PWM_STA_FULL1 as u32 != 0 {
-            self.pwm_address_map.STA.write(ARM_PWM_STA_FULL1 as u32);
-            warn!("pwm FIFO queue full!");
+            // warn!("pwm FIFO queue full! sta: {}", self.pwm_address_map.STA.read());
             // do nothing
         }
         self.pwm_address_map.FIF1.write(data);
