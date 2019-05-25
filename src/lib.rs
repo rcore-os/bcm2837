@@ -17,5 +17,6 @@ pub mod mailbox;
 pub mod mini_uart;
 pub mod pwm_sound_device;
 pub mod pwm;
+pub mod dma;
 pub mod timer;
 pub mod util;
