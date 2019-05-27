@@ -7,5 +7,5 @@ pub const RAW_IO_BASE: usize = 0x3F00_0000;
 pub const IO_BASE: usize = KERNEL_OFFSET + RAW_IO_BASE;
 
 // emmc section
-pub const RAW_EMMC_BASE: usize = 0x7E30_0000;
+pub const RAW_EMMC_BASE: usize = 0x3F30_0000;
 pub const EMMC_BASE: usize = KERNEL_OFFSET + RAW_EMMC_BASE;
