@@ -124,3 +124,7 @@ pub const ARM_CM_BASE: usize = IO_BASE + 0x101000;
 pub const ARM_CM_GP0CTL: usize = ARM_CM_BASE + 0x70;
 pub const ARM_CM_GP0DIV: usize = ARM_CM_BASE + 0x74;
 pub const ARM_CM_PASSWD: u32 = (0x5A << 24);
+
+// emmc section
+pub const RAW_EMMC_BASE: usize = 0x3F30_0000;
+pub const EMMC_BASE: usize = KERNEL_OFFSET + RAW_EMMC_BASE;
