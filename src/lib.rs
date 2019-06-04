@@ -18,4 +18,3 @@ pub mod mailbox;
 pub mod mini_uart;
 pub mod pwm;
 pub mod timer;
-pub mod util;

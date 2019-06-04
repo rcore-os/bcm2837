@@ -29,3 +29,9 @@ pub const ARM_PWM_DAT2: usize = (ARM_PWM_BASE + 0x24);
 // emmc section
 pub const RAW_EMMC_BASE: usize = 0x3F30_0000;
 pub const EMMC_BASE: usize = KERNEL_OFFSET + RAW_EMMC_BASE;
+
+// bus address (ref: peripherals page 6)
+#[allow(non_snake_case)]
+pub fn BUS_ADDRESS(addr: usize) -> usize {
+    ((addr) & !0xC0000000) | GPU_MEM_BASE
+}

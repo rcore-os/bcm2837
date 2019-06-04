@@ -48,11 +48,6 @@ pub const ARM_DMA_INT_STATUS: usize = (ARM_DMA_BASE + 0xFE0);
 pub const ARM_DMA_ENABLE: usize = (ARM_DMA_BASE + 0xFF0);
 
 #[allow(non_snake_case)]
-fn BUS_ADDRESS(addr: usize) -> usize {
-    ((addr) & !0xC0000000) | GPU_MEM_BASE
-}
-
-#[allow(non_snake_case)]
 fn DMA_CHANNEL_BASE(channel: usize) -> usize {
     ARM_DMA_BASE + ((channel) * 0x100)
 }
