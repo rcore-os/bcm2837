@@ -1,5 +1,5 @@
 use crate::consts::EMMC_BASE;
-use volatile::{ReadOnly, Volatile, WriteOnly};
+use volatile::Volatile;
 
 #[repr(C)]
 #[allow(non_snake_case)]
@@ -42,7 +42,7 @@ pub struct Emmc {
 impl Emmc {
     pub fn new() -> Emmc {
         Emmc {
-            registers : unsafe { &mut *(EMMC_BASE as *mut EmmcRegisters) }
+            registers: unsafe { &mut *(EMMC_BASE as *mut EmmcRegisters) },
         }
     }
 }

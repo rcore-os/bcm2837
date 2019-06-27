@@ -52,7 +52,9 @@ impl BasicTimer for SystemTimer {
         let current_low = self.registers.CLO.read();
         let compare = current_low.wrapping_add(us);
         self.registers.COMPARE[SystemTimerId::Timer1 as usize].write(compare);
-        self.registers.CS.write(1 << (SystemTimerId::Timer1 as usize)); // unmask
+        self.registers
+            .CS
+            .write(1 << (SystemTimerId::Timer1 as usize)); // unmask
     }
 
     fn is_pending(&self) -> bool {

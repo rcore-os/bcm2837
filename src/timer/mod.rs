@@ -36,3 +36,13 @@ pub fn delay(cycle: u32) {
         unsafe { asm!("nop") }
     }
 }
+
+/// wait for us microsecond
+pub fn delay_us(us: u64) {
+    let mut timer = Timer::new();
+    timer.init();
+    let start_time = timer.read();
+    while timer.read() - start_time < us {
+        // do nothing
+    }
+}
