@@ -1,15 +1,13 @@
 #![no_std]
-#![feature(alloc)]
 #![feature(asm)]
 
-extern crate alloc;
 extern crate volatile;
 #[macro_use]
 extern crate log;
 extern crate aarch64;
 
+pub mod addr;
 pub mod atags;
-pub mod consts;
 pub mod dma;
 pub mod emmc;
 pub mod gpio;

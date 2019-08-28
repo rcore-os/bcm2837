@@ -1,9 +1,12 @@
-use crate::consts::*;
+use crate::addr::{io_to_bus, phys_to_bus, IO_BASE};
+use crate::pwm::ARM_PWM_FIF1;
 use crate::timer::*;
 use volatile::Volatile;
 
-use aarch64::asm::*;
+use aarch64::asm::flush_dcache_range;
 use aarch64::barrier;
+
+const ARM_DMA_BASE: usize = IO_BASE + 0x7000;
 
 // DMA channel resource management (ref: peripherals page 39)
 pub const DMA_CHANNEL_MAX: usize = 12; // channels 0-12 are supported
@@ -133,10 +136,10 @@ impl DMA {
         );
         self.dma_control_block
             .SOURCE_AD
-            .write(BUS_ADDRESS(self.dma_buffer_paddr) as u32);
+            .write(phys_to_bus(self.dma_buffer_paddr as u32));
         self.dma_control_block
             .DEST_AD
-            .write(((ARM_PWM_FIF1 & 0xFFFFFF) + GPU_IO_BASE) as u32);
+            .write(io_to_bus(ARM_PWM_FIF1 as u32));
         self.dma_control_block.NEXTCONBK.write(0); // currently do not support block loop
         self.dma_control_block.STRIDE.write(0);
         self.dma_control_block
@@ -165,7 +168,7 @@ impl DMA {
             .write(self.dma_channel_register.CS.read() | (1 << 1)); // Clear END status
         self.dma_channel_register
             .CONBLK_AD
-            .write(BUS_ADDRESS(self.dma_control_block_paddr) as u32); // Write CB addr
+            .write(phys_to_bus(self.dma_control_block_paddr as u32)); // Write CB addr
         delay_us(2000);
         unsafe {
             barrier::wmb();

@@ -1,5 +1,5 @@
 use super::BasicTimer;
-use crate::consts::IO_BASE;
+use crate::addr::IO_BASE;
 use crate::interrupt::{Controller, Interrupt};
 use volatile::{ReadOnly, Volatile};
 

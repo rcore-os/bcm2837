@@ -1,5 +1,7 @@
-use crate::consts::EMMC_BASE;
+use crate::addr::IO_BASE;
 use volatile::Volatile;
+
+const EMMC_BASE: usize = IO_BASE + 0x300000;
 
 #[repr(C)]
 #[allow(non_snake_case)]

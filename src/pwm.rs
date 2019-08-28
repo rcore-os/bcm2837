@@ -1,6 +1,17 @@
-use crate::consts::*;
+use crate::addr::IO_BASE;
 use crate::timer::*;
 use volatile::Volatile;
+
+// PWM (ref: peripherals page 141)
+const ARM_PWM_BASE: usize = IO_BASE + 0x20C000;
+pub const ARM_PWM_CTL: usize = (ARM_PWM_BASE + 0x00);
+pub const ARM_PWM_STA: usize = (ARM_PWM_BASE + 0x04);
+pub const ARM_PWM_DMAC: usize = (ARM_PWM_BASE + 0x08);
+pub const ARM_PWM_RNG1: usize = (ARM_PWM_BASE + 0x10);
+pub const ARM_PWM_DAT1: usize = (ARM_PWM_BASE + 0x14);
+pub const ARM_PWM_FIF1: usize = (ARM_PWM_BASE + 0x18);
+pub const ARM_PWM_RNG2: usize = (ARM_PWM_BASE + 0x20);
+pub const ARM_PWM_DAT2: usize = (ARM_PWM_BASE + 0x24);
 
 // GPIO clock (ref: peripherals page 107)
 const CLK_CTL_BUSY: u32 = (1 << 7);

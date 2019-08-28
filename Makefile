@@ -8,3 +8,6 @@ clippy:
 
 clean:
 	cargo clean
+
+fmt:
+	cargo fmt
