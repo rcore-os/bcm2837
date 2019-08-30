@@ -1,12 +1,12 @@
 extern crate aarch64;
 
 use super::BasicTimer;
-use crate::addr::phys_to_virt;
+use crate::addr::KERNEL_OFFSET;
 use aarch64::regs::*;
 use volatile::*;
 
 /// The base address for the ARM generic timer, IRQs, mailboxes
-const GEN_TIMER_REG_BASE: usize = phys_to_virt(0x4000_0000);
+const GEN_TIMER_REG_BASE: usize = KERNEL_OFFSET + 0x4000_0000;
 
 /// Core interrupt sources (ref: QA7 4.10, page 16)
 #[repr(u8)]
