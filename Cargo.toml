@@ -1,6 +1,6 @@
 [package]
 name = "bcm2837"
-version = "2.1.0"
+version = "2.2.0"
 authors = [
     "equation314 <equation618@gmail.com>",
     "Tianyu Gao <gaotianyu1350@126.com>",
@@ -9,7 +9,7 @@ authors = [
 edition = "2018"
 
 [features]
-bare_metal = []
+lower_va_range = []
 use_generic_timer = []
 
 [dependencies]

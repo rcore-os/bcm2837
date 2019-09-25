@@ -3,10 +3,10 @@ mod raw;
 
 pub use self::atag::*;
 pub use self::raw::{Cmd, Core, Mem};
-use crate::addr::KERNEL_OFFSET;
+use crate::addr::VA_BASE;
 
 /// The address at which the firmware loads the ATAGS.
-const ATAG_BASE: usize = KERNEL_OFFSET + 0x100;
+const ATAG_BASE: usize = VA_BASE + 0x100;
 
 /// An iterator over the ATAGS on this system.
 pub struct Atags {

@@ -1,24 +1,11 @@
-pub const PHYSICAL_MEMORY_OFFSET: usize = 0xFFFF_0000_0000_0000;
-#[cfg(feature = "bare_metal")]
-pub const KERNEL_OFFSET: usize = 0;
-#[cfg(not(feature = "bare_metal"))]
-pub const KERNEL_OFFSET: usize = PHYSICAL_MEMORY_OFFSET;
+#[cfg(feature = "lower_va_range")]
+pub const VA_BASE: usize = 0;
+#[cfg(not(feature = "lower_va_range"))]
+pub const VA_BASE: usize = 0xFFFF_0000_0000_0000;
 
-pub const PHYSICAL_IO_START: usize = 0x3F00_0000;
-pub const PHYSICAL_IO_END: usize = 0x4000_0000;
-pub const IO_BASE: usize = KERNEL_OFFSET + PHYSICAL_IO_START;
-
-/// Convert physical address to virtual address
-#[inline]
-pub const fn phys_to_virt(paddr: usize) -> usize {
-    PHYSICAL_MEMORY_OFFSET + paddr
-}
-
-/// Convert virtual address to physical address
-#[inline]
-pub const fn virt_to_phys(vaddr: usize) -> usize {
-    vaddr - PHYSICAL_MEMORY_OFFSET
-}
+pub const PERIPHERALS_START: usize = 0x3F00_0000;
+pub const PERIPHERALS_END: usize = 0x4000_1000;
+pub const IO_BASE: usize = VA_BASE + PERIPHERALS_START;
 
 /// Convert physical address to bus address (ref: peripherals page 6)
 #[inline]
