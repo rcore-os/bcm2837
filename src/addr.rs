@@ -5,7 +5,9 @@ pub const VA_BASE: usize = 0xFFFF_0000_0000_0000;
 
 pub const PERIPHERALS_START: usize = 0x3F00_0000;
 pub const PERIPHERALS_END: usize = 0x4000_1000;
+pub const CONTROL_START: usize = 0x4000_0000;
 pub const IO_BASE: usize = VA_BASE + PERIPHERALS_START;
+pub const CONTROL_BASE: usize = VA_BASE + CONTROL_START;
 
 /// Convert physical address to bus address (ref: peripherals page 6)
 #[inline]
