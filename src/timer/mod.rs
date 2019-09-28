@@ -7,10 +7,10 @@ pub use local_timer::LocalTimer;
 pub use system_timer::SystemTimer;
 
 /// The main timer
-pub type Timer = LocalTimer;
+pub type Timer = GenericTimer;
 
 /// The timer used for `delay_us`
-pub type DelayTimer = GenericTimer;
+pub type DelayTimer = LocalTimer;
 
 /// The Raspberry Pi timer.
 pub trait BasicTimer {

@@ -1,8 +1,6 @@
-extern crate aarch64;
-
 use super::BasicTimer;
 use crate::qa7_control::{CoreInterruptSource, QA7Control};
-use aarch64::regs::*;
+use aarch64::{asm, regs::*};
 
 /// Core timers interrupts (ref: QA7 4.6, page 13)
 #[repr(u8)]
@@ -36,14 +34,14 @@ impl BasicTimer for GenericTimer {
 
     #[inline]
     fn init(&mut self) {
-        self.control.registers.CORE_TIMER_IRQCNTL[0]
+        self.control.registers.CORE_TIMER_IRQCNTL[asm::cpuid()]
             .write(1 << (CoreTimerControl::CNTPNSIRQ as u8));
         CNTP_CTL_EL0.write(CNTP_CTL_EL0::ENABLE::SET);
     }
 
     #[inline]
     fn stop(&mut self) {
-        self.control.registers.CORE_TIMER_IRQCNTL[0].write(0);
+        self.control.registers.CORE_TIMER_IRQCNTL[asm::cpuid()].write(0);
     }
 
     #[inline]
@@ -62,6 +60,6 @@ impl BasicTimer for GenericTimer {
     #[inline]
     fn is_pending(&self) -> bool {
         self.control
-            .is_irq_pending(0, CoreInterruptSource::CNTPNSIRQ)
+            .is_irq_pending(asm::cpuid(), CoreInterruptSource::CNTPNSIRQ)
     }
 }
