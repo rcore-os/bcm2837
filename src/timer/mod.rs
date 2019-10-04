@@ -9,9 +9,6 @@ pub use system_timer::SystemTimer;
 /// The main timer
 pub type Timer = GenericTimer;
 
-/// The timer used for `delay_us`
-pub type DelayTimer = LocalTimer;
-
 /// The Raspberry Pi timer.
 pub trait BasicTimer {
     /// The timer frequency (Hz)
@@ -49,9 +46,10 @@ pub fn delay(cycle: usize) {
 
 /// wait for us microsecond
 pub fn delay_us(us: usize) {
-    let mut timer = DelayTimer::new();
+    let mut timer = Timer::new();
     timer.init();
-    timer.tick_in(us);
-    while !timer.is_pending() {}
-    timer.stop();
+    let start_time = timer.read();
+    while timer.read() - start_time < us as u64 {
+        unsafe { asm!("nop") }
+    }
 }

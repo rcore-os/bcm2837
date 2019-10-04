@@ -1,6 +1,6 @@
 [package]
 name = "bcm2837"
-version = "2.5.0"
+version = "2.5.1"
 authors = [
     "equation314 <equation618@gmail.com>",
     "Tianyu Gao <gaotianyu1350@126.com>",
