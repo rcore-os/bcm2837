@@ -1,6 +1,6 @@
 [package]
 name = "bcm2837"
-version = "2.4.0"
+version = "2.5.0"
 authors = [
     "equation314 <equation618@gmail.com>",
     "Tianyu Gao <gaotianyu1350@126.com>",
@@ -14,4 +14,4 @@ lower_va_range = []
 [dependencies]
 log = "0.4"
 volatile = "0.2.4"
-aarch64= { git = "https://github.com/rcore-os/aarch64", version = "2.8.0" }
+aarch64= { git = "https://github.com/rcore-os/aarch64", version = "3.0.0" }

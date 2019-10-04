@@ -3,8 +3,8 @@ use crate::pwm::ARM_PWM_FIF1;
 use crate::timer::*;
 use volatile::Volatile;
 
-use aarch64::asm::flush_dcache_range;
 use aarch64::barrier;
+use aarch64::cache::*;
 
 const ARM_DMA_BASE: usize = IO_BASE + 0x7000;
 
@@ -150,11 +150,12 @@ impl DMA {
         delay_us(2000);
 
         // Invalidate cache of DMA control block and buffer
-        flush_dcache_range(
+        DCache::<Clean, PoC>::flush_area(
             (self.dma_control_block as *const DMAControlBlock) as usize,
-            (self.dma_control_block as *const DMAControlBlock) as usize + 32,
+            32,
+            SY,
         );
-        flush_dcache_range(self.dma_buffer_vaddr, self.dma_chunk_size * 4);
+        DCache::<Clean, PoC>::flush_area(self.dma_buffer_vaddr, self.dma_chunk_size * 4, SY);
 
         // Set DMA channel register
         self.dma_channel_register
