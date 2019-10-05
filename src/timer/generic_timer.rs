@@ -22,7 +22,8 @@ pub struct GenericTimer {
 impl BasicTimer for GenericTimer {
     #[inline]
     fn freq() -> u64 {
-        CNTFRQ_EL0.get() as u64 // 62500000
+         // 62500000 on qemu, 19200000 on real machine
+        CNTFRQ_EL0.get() as u64
     }
 
     #[inline]
