@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(asm)]
+#![allow(unused_parens)]
 
 extern crate volatile;
 #[macro_use]

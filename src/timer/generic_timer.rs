@@ -22,7 +22,7 @@ pub struct GenericTimer {
 impl BasicTimer for GenericTimer {
     #[inline]
     fn freq() -> u64 {
-         // 62500000 on qemu, 19200000 on real machine
+        // 62500000 on qemu, 19200000 on real machine
         CNTFRQ_EL0.get() as u64
     }
 
@@ -55,7 +55,7 @@ impl BasicTimer for GenericTimer {
         let count = Self::freq() * (us as u64) / 1000000;
         // max `68719476` us (0xffff_ffff / 38400000 * 62500000).
         debug_assert!(count <= u32::max_value() as u64);
-        CNTP_TVAL_EL0.set(count as u32);
+        CNTP_TVAL_EL0.set(count);
     }
 
     #[inline]

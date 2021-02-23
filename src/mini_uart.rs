@@ -3,7 +3,7 @@ use crate::gpio::{Function, Gpio};
 use volatile::{ReadOnly, Volatile};
 
 /// The `AUXENB` register from page 9 of the BCM2837 documentation.
-const AUX_ENABLES: *mut Volatile<u8> = (IO_BASE + 0x215004) as *mut Volatile<u8>;
+const AUX_ENABLES: *mut Volatile<u32> = (IO_BASE + 0x215004) as *mut Volatile<u32>;
 
 /// The base address for the `MU` registers.
 const MU_REG_BASE: usize = IO_BASE + 0x215040;
@@ -26,32 +26,23 @@ enum LsrStatus {
 #[repr(C)]
 #[allow(non_snake_case)]
 struct Registers {
-    AUX_MU_IO_REG: Volatile<u8>,
-    __r0: [u8; 3],
-    AUX_MU_IER_REG: Volatile<u8>,
-    __r1: [u8; 3],
-    AUX_MU_IIR_REG: Volatile<u8>,
-    __r2: [u8; 3],
-    AUX_MU_LCR_REG: Volatile<u8>,
-    __r3: [u8; 3],
-    AUX_MU_MCR_REG: Volatile<u8>,
-    __r4: [u8; 3],
-    AUX_MU_LSR_REG: ReadOnly<u8>,
-    __r5: [u8; 3],
-    AUX_MU_MSR_REG: ReadOnly<u8>,
-    __r6: [u8; 3],
-    AUX_MU_SCRATCH: Volatile<u8>,
-    __r7: [u8; 3],
-    AUX_MU_CNTL_REG: Volatile<u8>,
-    __r8: [u8; 3],
+    AUX_MU_IO_REG: Volatile<u32>,
+    AUX_MU_IER_REG: Volatile<u32>,
+    AUX_MU_IIR_REG: Volatile<u32>,
+    AUX_MU_LCR_REG: Volatile<u32>,
+    AUX_MU_MCR_REG: Volatile<u32>,
+    AUX_MU_LSR_REG: ReadOnly<u32>,
+    AUX_MU_MSR_REG: ReadOnly<u32>,
+    AUX_MU_SCRATCH: Volatile<u32>,
+    AUX_MU_CNTL_REG: Volatile<u32>,
     AUX_MU_STAT_REG: ReadOnly<u32>,
-    AUX_MU_BAUD_REG: Volatile<u16>,
+    AUX_MU_BAUD_REG: Volatile<u32>,
 }
 
 /// The Raspberry Pi's "mini UART".
 pub struct MiniUart {
     registers: &'static mut Registers,
-    timeout: Option<u32>,
+    _timeout: Option<u32>,
 }
 
 impl MiniUart {
@@ -62,7 +53,7 @@ impl MiniUart {
 
         MiniUart {
             registers: registers,
-            timeout: None,
+            _timeout: None,
         }
     }
 
@@ -91,21 +82,21 @@ impl MiniUart {
 
     /// Set the read timeout to `milliseconds` milliseconds.
     pub fn set_read_timeout(&mut self, milliseconds: u32) {
-        self.timeout = Some(milliseconds)
+        self._timeout = Some(milliseconds)
     }
 
     /// Write the byte `byte`. This method blocks until there is space available
     /// in the output FIFO.
     pub fn write_byte(&mut self, byte: u8) {
-        while self.registers.AUX_MU_LSR_REG.read() & (LsrStatus::TxAvailable as u8) == 0 {}
-        self.registers.AUX_MU_IO_REG.write(byte);
+        while self.registers.AUX_MU_LSR_REG.read() as u8 & (LsrStatus::TxAvailable as u8) == 0 {}
+        self.registers.AUX_MU_IO_REG.write(byte as u32);
     }
 
     /// Returns `true` if there is at least one byte ready to be read. If this
     /// method returns `true`, a subsequent call to `read_byte` is guaranteed to
     /// return immediately. This method does not block.
     pub fn has_byte(&self) -> bool {
-        self.registers.AUX_MU_LSR_REG.read() & (LsrStatus::DataReady as u8) != 0
+        self.registers.AUX_MU_LSR_REG.read() as u8 & (LsrStatus::DataReady as u8) != 0
     }
 
     /// Blocks until there is a byte ready to read. If a read timeout is set,
@@ -123,11 +114,11 @@ impl MiniUart {
     /// Reads a byte. Blocks indefinitely until a byte is ready to be read.
     pub fn read_byte(&self) -> u8 {
         while !self.has_byte() {}
-        self.registers.AUX_MU_IO_REG.read()
+        self.registers.AUX_MU_IO_REG.read() as u8
     }
 
     // Read `AUX_MU_IIR_REG` and determine if the interrupt `id` is pending.
     pub fn interrupt_is_pending(&self, id: MiniUartInterruptId) -> bool {
-        self.registers.AUX_MU_IIR_REG.read() & 0b110 == id as u8
+        self.registers.AUX_MU_IIR_REG.read() as u8 & 0b110 == id as u8
     }
 }
